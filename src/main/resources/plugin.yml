@@ -1,0 +1,22 @@
+name: CombatSystem
+version: ${version}
+main: cn.mythicland.combatsystem.CombatSystemPlugin
+author: ShanguanLinG
+load: POSTWORLD
+depend: [ Lib ]
+softdepend: [ MythicMobs ]
+description: Simple RPG combat attributes from legacy item lore.
+
+commands:
+  combatsystem:
+    description: View and manage CombatSystem RPG attributes.
+    aliases: [ cs ]
+    usage: /combatsystem <stats|reload|debug>
+
+permissions:
+  combatsystem.stats:
+    description: View your CombatSystem RPG attributes.
+    default: true
+  combatsystem.admin:
+    description: Reload CombatSystem and inspect parsed lore.
+    default: op

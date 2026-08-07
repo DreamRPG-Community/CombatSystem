@@ -1,0 +1,61 @@
+package cn.mythicland.combatsystem.config;
+
+import cn.mythicland.lib.config.ConfigSupport;
+import cn.mythicland.lib.text.LegacyText;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.Locale;
+import java.util.Objects;
+
+/**
+ * Configured messages for triggered Combat effects.
+ */
+record CombatMessages(String criticalHitTemplate, String healthRegenTemplate) {
+
+    private static final String DEFAULT_CRITICAL_HIT = "&6暴击! &f造成 &c{damage} &f点伤害";
+    private static final String DEFAULT_HEALTH_REGEN = "&a生命回复 &f+{amount}";
+
+    CombatMessages {
+        Objects.requireNonNull(criticalHitTemplate, "criticalHitTemplate");
+        Objects.requireNonNull(healthRegenTemplate, "healthRegenTemplate");
+    }
+
+    static CombatMessages defaults() {
+        return new CombatMessages(DEFAULT_CRITICAL_HIT, DEFAULT_HEALTH_REGEN);
+    }
+
+    static CombatMessages load(JavaPlugin plugin, FileConfiguration configuration) {
+        return new CombatMessages(
+                ConfigSupport.getString(
+                        plugin,
+                        configuration,
+                        "messages.critical-hit",
+                        DEFAULT_CRITICAL_HIT
+                ),
+                ConfigSupport.getString(
+                        plugin,
+                        configuration,
+                        "messages.health-regen",
+                        DEFAULT_HEALTH_REGEN
+                )
+        );
+    }
+
+    String criticalHit(double damage) {
+        return render(criticalHitTemplate, "damage", damage);
+    }
+
+    String healthRegen(double amount) {
+        return render(healthRegenTemplate, "amount", amount);
+    }
+
+    private static String render(String template, String placeholder, double value) {
+        String formattedValue = format(value);
+        return LegacyText.colorize(template.replace("{" + placeholder + "}", formattedValue));
+    }
+
+    private static String format(double value) {
+        return String.format(Locale.ROOT, "%.2f", value).replaceAll("\\.?0+$", "");
+    }
+}

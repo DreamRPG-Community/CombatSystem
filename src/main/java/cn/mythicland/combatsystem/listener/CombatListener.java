@@ -1,0 +1,244 @@
+package cn.mythicland.combatsystem.listener;
+
+import cn.mythicland.combatsystem.CombatSystemPlugin;
+import cn.mythicland.combatsystem.actionbar.CombatHealthBarService;
+import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
+import cn.mythicland.combatsystem.combat.CombatFormula;
+import cn.mythicland.combatsystem.stats.CombatStatsService;
+import cn.mythicland.lib.api.LibApi;
+import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+@SuppressWarnings("deprecation")
+public final class CombatListener implements Listener {
+
+    private static final UUID HEALTH_MODIFIER_ID = UUID.fromString("5d3a95aa-0bd7-4cc6-9c7c-24e39e0f6d68");
+    private static final String HEALTH_MODIFIER_NAME = "Combat Lore Health";
+
+    private final CombatSystemPlugin plugin;
+    private final LibApi lib;
+    private final CombatStatsService statsService;
+    private final CombatHealthBarService healthBarService;
+    private final Set<UUID> queuedRefreshes = new HashSet<>();
+
+    public CombatListener(
+            CombatSystemPlugin plugin,
+            LibApi lib,
+            CombatStatsService statsService,
+            CombatHealthBarService healthBarService
+    ) {
+        this.plugin = plugin;
+        this.lib = lib;
+        this.statsService = statsService;
+        this.healthBarService = healthBarService;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof LivingEntity target)) return;
+
+        Player attacker = findPlayerAttacker(event.getDamager());
+        boolean critical = false;
+        if (attacker != null) {
+            CombatStatsSnapshot attackerStats = statsService.getStats(attacker);
+            double baseDamage = event.getDamage(EntityDamageEvent.DamageModifier.BASE);
+            if (attackerStats.hasDamage()) {
+                baseDamage = CombatFormula.damage(attackerStats, ThreadLocalRandom.current().nextDouble());
+            }
+            critical = CombatFormula.critical(
+                    attackerStats,
+                    ThreadLocalRandom.current().nextDouble(0.0D, 100.0D)
+            );
+            if (attackerStats.hasDamage() || critical) {
+                double multiplier = CombatFormula.criticalMultiplier(attackerStats, critical);
+                event.setDamage(EntityDamageEvent.DamageModifier.BASE, baseDamage * multiplier);
+            }
+        }
+
+        CombatStatsSnapshot targetStats = statsService.getStats(target);
+        if (targetStats.hasDefense()) applyDefense(event, targetStats.defensePercent());
+        if (attacker != null) healthBarService.recordHit(attacker, target, event.getFinalDamage());
+        if (critical) playCriticalEffects(target);
+        if (critical && plugin.settings().feedbackEnabled()) {
+            String message = plugin.settings().criticalHitMessage(event.getFinalDamage());
+            if (!message.isBlank()) attacker.sendMessage(message);
+        }
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        refresh(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        refresh(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onChangedWorld(PlayerChangedWorldEvent event) {
+        refresh(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onHeldItem(PlayerItemHeldEvent event) {
+        refresh(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onSwapHandItems(PlayerSwapHandItemsEvent event) {
+        refresh(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) refresh(player);
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player) refresh(player);
+    }
+
+    @EventHandler
+    public void onDrop(PlayerDropItemEvent event) {
+        refresh(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onEntityPickup(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player player) refresh(player);
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        queuedRefreshes.remove(event.getPlayer().getUniqueId());
+        healthBarService.clear(event.getPlayer());
+    }
+
+    public void refreshOnlinePlayers() {
+        for (Player player : plugin.getServer().getOnlinePlayers()) refresh(player);
+    }
+
+    public void regenerateOnlinePlayers() {
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            CombatStatsSnapshot stats = statsService.getStats(player);
+            if (stats.healthRegenPercent() <= 0.0D) continue;
+            AttributeInstance attribute = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+            if (attribute == null) continue;
+            double maximumHealth = attribute.getValue();
+            double amount = maximumHealth * stats.healthRegenPercent() / 100.0D;
+            double currentHealth = player.getHealth();
+            if (amount <= 0.0D || currentHealth >= maximumHealth) continue;
+            double restored = Math.min(amount, maximumHealth - currentHealth);
+            if (restored <= 0.0D) continue;
+            player.setHealth(currentHealth + restored);
+            if (plugin.settings().feedbackEnabled()) {
+                String message = plugin.settings().healthRegenMessage(restored);
+                if (!message.isBlank()) player.sendMessage(message);
+            }
+        }
+    }
+
+    public void removeHealthModifier(Player player) {
+        AttributeInstance attribute = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        if (attribute == null) return;
+        AttributeModifier modifier = findHealthModifier(attribute);
+        if (modifier != null) attribute.removeModifier(modifier);
+        if (player.getHealth() > attribute.getValue()) player.setHealth(attribute.getValue());
+    }
+
+    private void refresh(Player player) {
+        UUID uniqueId = player.getUniqueId();
+        if (!queuedRefreshes.add(uniqueId)) return;
+        lib.runLater(1L, () -> {
+            queuedRefreshes.remove(uniqueId);
+            if (!player.isOnline()) return;
+            applyHealthModifier(player);
+        });
+    }
+
+    private void applyHealthModifier(Player player) {
+        AttributeInstance attribute = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        if (attribute == null) return;
+        AttributeModifier previous = findHealthModifier(attribute);
+        if (previous != null) attribute.removeModifier(previous);
+
+        CombatStatsSnapshot stats = statsService.getStats(player);
+        if (stats.health() > 0.0D) {
+            attribute.addModifier(new AttributeModifier(
+                    HEALTH_MODIFIER_ID,
+                    HEALTH_MODIFIER_NAME,
+                    stats.health(),
+                    AttributeModifier.Operation.ADD_NUMBER
+            ));
+        }
+        if (player.getHealth() > attribute.getValue()) player.setHealth(attribute.getValue());
+    }
+
+    private static void applyDefense(EntityDamageByEntityEvent event, double defensePercent) {
+        try {
+            if (event.isApplicable(EntityDamageEvent.DamageModifier.ARMOR)) {
+                double vanillaArmorModifier = event.getDamage(EntityDamageEvent.DamageModifier.ARMOR);
+                double damageWithoutArmor = Math.max(0.0D, event.getFinalDamage() - vanillaArmorModifier);
+                double customFinalDamage = CombatFormula.applyDefense(damageWithoutArmor, defensePercent);
+                event.setDamage(
+                        EntityDamageEvent.DamageModifier.ARMOR,
+                        customFinalDamage - damageWithoutArmor
+                );
+                return;
+            }
+        } catch (IllegalArgumentException | UnsupportedOperationException ignored) {
+            // Some damage causes do not expose an armor modifier; the base fallback below is enough.
+        }
+        event.setDamage(CombatFormula.applyDefense(event.getFinalDamage(), defensePercent));
+    }
+
+    private static void playCriticalEffects(LivingEntity target) {
+        Location location = target.getLocation().add(0.0D, target.getHeight() * 0.5D, 0.0D);
+        target.getWorld().spawnParticle(Particle.CRIT, location, 10, 0.3D, 0.4D, 0.3D, 0.1D);
+        target.getWorld().playSound(location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0F, 1.0F);
+    }
+
+    private static Player findPlayerAttacker(Entity damager) {
+        if (damager instanceof Player player) return player;
+        if (!(damager instanceof Projectile projectile)) return null;
+        return projectile.getShooter() instanceof Player player ? player : null;
+    }
+
+    private static AttributeModifier findHealthModifier(AttributeInstance attribute) {
+        for (AttributeModifier modifier : attribute.getModifiers()) {
+            if (HEALTH_MODIFIER_ID.equals(modifier.getUniqueId())) return modifier;
+        }
+        return null;
+    }
+
+}

@@ -1,0 +1,17 @@
+# Whether triggered Combat effects should send chat messages.
+combat-feedback: false
+
+# These templates are used only when a triggered attribute takes effect.
+# Placeholders: {damage} is final critical-hit damage, and {amount} is restored health.
+messages:
+  critical-hit: "&c&l暴击! &f你造成了&c{damage}&f点伤害!"
+  health-regen: "&a&l生命回复! &f你恢复了&c{amount}&f点生命值!"
+
+# Display labels are configurable; the built-in Chinese aliases remain accepted by the parser.
+labels:
+  damage: "伤害"
+  defense: "防御"
+  health: "生命值"
+  health-regen: "生命回复"
+  crit-chance: "暴击几率"
+  crit-damage: "暴击伤害"
