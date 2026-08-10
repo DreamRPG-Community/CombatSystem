@@ -62,7 +62,8 @@ public final class CombatSystemPlugin extends JavaPlugin {
      * Reloads the mutable CombatSystem configuration.
      */
     public void reloadCombatConfig() {
-        lifecycle().reloadConfiguration();
+        if (bootstrap == null) throw new IllegalStateException("CombatSystem bootstrap is unavailable");
+        bootstrap.reload();
     }
 
     private CombatSystemLifecycle lifecycle() {

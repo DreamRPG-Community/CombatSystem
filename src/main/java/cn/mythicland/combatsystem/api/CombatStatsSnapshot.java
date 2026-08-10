@@ -1,6 +1,7 @@
 package cn.mythicland.combatsystem.api;
 
 import cn.mythicland.combatsystem.lore.CombatStat;
+
 import java.util.Objects;
 
 /**
@@ -58,6 +59,12 @@ public final class CombatStatsSnapshot {
      */
     public static CombatStatsSnapshot empty() {
         return builder().build();
+    }
+
+    private static void validateNonNegative(double value, String name) {
+        if (!Double.isFinite(value) || value < 0.0D) {
+            throw new IllegalArgumentException(name + " must be finite and non-negative");
+        }
     }
 
     public double damageMinimum() {
@@ -161,12 +168,6 @@ public final class CombatStatsSnapshot {
                 + ", critChancePercent=" + critChancePercent
                 + ", critDamagePercent=" + critDamagePercent
                 + ']';
-    }
-
-    private static void validateNonNegative(double value, String name) {
-        if (!Double.isFinite(value) || value < 0.0D) {
-            throw new IllegalArgumentException(name + " must be finite and non-negative");
-        }
     }
 
     /**

@@ -32,6 +32,13 @@ final class CombatHealthBarStatus {
         return new Builder();
     }
 
+    private static double nonNegativeFinite(double value, String name) {
+        if (!Double.isFinite(value) || value < 0.0D) {
+            throw new IllegalArgumentException(name + " must be finite and non-negative");
+        }
+        return value;
+    }
+
     UUID targetUniqueId() {
         return targetUniqueId;
     }
@@ -58,13 +65,6 @@ final class CombatHealthBarStatus {
 
     boolean expired(long nowMillis) {
         return nowMillis >= expiresAtMillis;
-    }
-
-    private static double nonNegativeFinite(double value, String name) {
-        if (!Double.isFinite(value) || value < 0.0D) {
-            throw new IllegalArgumentException(name + " must be finite and non-negative");
-        }
-        return value;
     }
 
     static final class Builder {

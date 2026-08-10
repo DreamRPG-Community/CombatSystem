@@ -1,9 +1,6 @@
 package cn.mythicland.combatsystem.config;
 
-import cn.mythicland.lib.config.ConfigSupport;
 import cn.mythicland.lib.text.LegacyText;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Locale;
 import java.util.Objects;
@@ -25,21 +22,13 @@ record CombatMessages(String criticalHitTemplate, String healthRegenTemplate) {
         return new CombatMessages(DEFAULT_CRITICAL_HIT, DEFAULT_HEALTH_REGEN);
     }
 
-    static CombatMessages load(JavaPlugin plugin, FileConfiguration configuration) {
-        return new CombatMessages(
-                ConfigSupport.getString(
-                        plugin,
-                        configuration,
-                        "messages.critical-hit",
-                        DEFAULT_CRITICAL_HIT
-                ),
-                ConfigSupport.getString(
-                        plugin,
-                        configuration,
-                        "messages.health-regen",
-                        DEFAULT_HEALTH_REGEN
-                )
-        );
+    private static String render(String template, String placeholder, double value) {
+        String formattedValue = format(value);
+        return LegacyText.colorize(template.replace("{" + placeholder + "}", formattedValue));
+    }
+
+    private static String format(double value) {
+        return String.format(Locale.ROOT, "%.2f", value).replaceAll("\\.?0+$", "");
     }
 
     String criticalHit(double damage) {
@@ -48,14 +37,5 @@ record CombatMessages(String criticalHitTemplate, String healthRegenTemplate) {
 
     String healthRegen(double amount) {
         return render(healthRegenTemplate, "amount", amount);
-    }
-
-    private static String render(String template, String placeholder, double value) {
-        String formattedValue = format(value);
-        return LegacyText.colorize(template.replace("{" + placeholder + "}", formattedValue));
-    }
-
-    private static String format(double value) {
-        return String.format(Locale.ROOT, "%.2f", value).replaceAll("\\.?0+$", "");
     }
 }

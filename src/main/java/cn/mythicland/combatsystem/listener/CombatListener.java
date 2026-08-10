@@ -20,17 +20,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -59,6 +53,43 @@ public final class CombatListener implements Listener {
         this.tasks = tasks;
         this.statsService = statsService;
         this.healthBarService = healthBarService;
+    }
+
+    private static void applyDefense(EntityDamageByEntityEvent event, double defensePercent) {
+        try {
+            if (event.isApplicable(EntityDamageEvent.DamageModifier.ARMOR)) {
+                double vanillaArmorModifier = event.getDamage(EntityDamageEvent.DamageModifier.ARMOR);
+                double damageWithoutArmor = Math.max(0.0D, event.getFinalDamage() - vanillaArmorModifier);
+                double customFinalDamage = CombatFormula.applyDefense(damageWithoutArmor, defensePercent);
+                event.setDamage(
+                        EntityDamageEvent.DamageModifier.ARMOR,
+                        customFinalDamage - damageWithoutArmor
+                );
+                return;
+            }
+        } catch (IllegalArgumentException | UnsupportedOperationException ignored) {
+            // Some damage causes do not expose an armor modifier; the base fallback below is enough.
+        }
+        event.setDamage(CombatFormula.applyDefense(event.getFinalDamage(), defensePercent));
+    }
+
+    private static void playCriticalEffects(LivingEntity target) {
+        Location location = target.getLocation().add(0.0D, target.getHeight() * 0.5D, 0.0D);
+        target.getWorld().spawnParticle(Particle.CRIT, location, 10, 0.3D, 0.4D, 0.3D, 0.1D);
+        target.getWorld().playSound(location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0F, 1.0F);
+    }
+
+    private static Player findPlayerAttacker(Entity damager) {
+        if (damager instanceof Player player) return player;
+        if (!(damager instanceof Projectile projectile)) return null;
+        return projectile.getShooter() instanceof Player player ? player : null;
+    }
+
+    private static AttributeModifier findHealthModifier(AttributeInstance attribute) {
+        for (AttributeModifier modifier : attribute.getModifiers()) {
+            if (HEALTH_MODIFIER_ID.equals(modifier.getUniqueId())) return modifier;
+        }
+        return null;
     }
 
     @EventHandler(
@@ -205,43 +236,6 @@ public final class CombatListener implements Listener {
             ));
         }
         if (player.getHealth() > attribute.getValue()) player.setHealth(attribute.getValue());
-    }
-
-    private static void applyDefense(EntityDamageByEntityEvent event, double defensePercent) {
-        try {
-            if (event.isApplicable(EntityDamageEvent.DamageModifier.ARMOR)) {
-                double vanillaArmorModifier = event.getDamage(EntityDamageEvent.DamageModifier.ARMOR);
-                double damageWithoutArmor = Math.max(0.0D, event.getFinalDamage() - vanillaArmorModifier);
-                double customFinalDamage = CombatFormula.applyDefense(damageWithoutArmor, defensePercent);
-                event.setDamage(
-                        EntityDamageEvent.DamageModifier.ARMOR,
-                        customFinalDamage - damageWithoutArmor
-                );
-                return;
-            }
-        } catch (IllegalArgumentException | UnsupportedOperationException ignored) {
-            // Some damage causes do not expose an armor modifier; the base fallback below is enough.
-        }
-        event.setDamage(CombatFormula.applyDefense(event.getFinalDamage(), defensePercent));
-    }
-
-    private static void playCriticalEffects(LivingEntity target) {
-        Location location = target.getLocation().add(0.0D, target.getHeight() * 0.5D, 0.0D);
-        target.getWorld().spawnParticle(Particle.CRIT, location, 10, 0.3D, 0.4D, 0.3D, 0.1D);
-        target.getWorld().playSound(location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0F, 1.0F);
-    }
-
-    private static Player findPlayerAttacker(Entity damager) {
-        if (damager instanceof Player player) return player;
-        if (!(damager instanceof Projectile projectile)) return null;
-        return projectile.getShooter() instanceof Player player ? player : null;
-    }
-
-    private static AttributeModifier findHealthModifier(AttributeInstance attribute) {
-        for (AttributeModifier modifier : attribute.getModifiers()) {
-            if (HEALTH_MODIFIER_ID.equals(modifier.getUniqueId())) return modifier;
-        }
-        return null;
     }
 
 }

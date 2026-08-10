@@ -8,12 +8,7 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.LongSupplier;
 
 /**
@@ -40,6 +35,17 @@ public final class CombatHealthBarService {
     ) {
         this.currentTimeMillis = Objects.requireNonNull(currentTimeMillis, "currentTimeMillis");
         this.mythicMobsAdapter = Objects.requireNonNull(mythicMobsAdapter, "mythicMobsAdapter");
+    }
+
+    @SuppressWarnings("deprecation")
+    private static double maxHealth(LivingEntity target) {
+        AttributeInstance attribute = target.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        if (attribute != null) return Math.max(1.0D, attribute.getValue());
+        return Math.max(1.0D, target.getMaxHealth());
+    }
+
+    private static double nonNegativeFinite(double value) {
+        return Double.isFinite(value) ? Math.max(0.0D, value) : 0.0D;
     }
 
     /**
@@ -129,17 +135,6 @@ public final class CombatHealthBarService {
             return;
         }
         LegacyActionBar.send(attacker, CombatHealthBarFormatter.render(status));
-    }
-
-    @SuppressWarnings("deprecation")
-    private static double maxHealth(LivingEntity target) {
-        AttributeInstance attribute = target.getAttribute(Attribute.GENERIC_MAX_HEALTH);
-        if (attribute != null) return Math.max(1.0D, attribute.getValue());
-        return Math.max(1.0D, target.getMaxHealth());
-    }
-
-    private static double nonNegativeFinite(double value) {
-        return Double.isFinite(value) ? Math.max(0.0D, value) : 0.0D;
     }
 
     private String targetDisplayName(LivingEntity target) {

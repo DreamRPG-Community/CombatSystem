@@ -6,12 +6,7 @@ import cn.mythicland.lib.item.LoreAttributeParseResult;
 import cn.mythicland.lib.item.LoreAttributeParser;
 import cn.mythicland.lib.item.NumericRange;
 
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public final class CombatLoreParser {
 
@@ -29,6 +24,27 @@ public final class CombatLoreParser {
             mutableAliases.putIfAbsent(normalize(validatedSettings.labelText(stat)), stat);
         }
         aliases = Map.copyOf(mutableAliases);
+    }
+
+    private static NumericRange sum(NumericRange first, NumericRange second) {
+        return new NumericRange(
+                first.minimum() + second.minimum(),
+                first.maximum() + second.maximum(),
+                first.percent() || second.percent()
+        );
+    }
+
+    private static String validate(CombatStat stat, NumericRange value) {
+        if (value.minimum() <= 0.0D || value.maximum() <= 0.0D) {
+            return "属性数值必须为正数";
+        }
+        if (!stat.percentageAttribute() && value.percent()) {
+            return "该属性不应带百分号";
+        }
+        if (value.maximum() > MAX_ATTRIBUTE_VALUE) {
+            return "属性数值超过安全上限";
+        }
+        return null;
     }
 
     public CombatItemStats parse(List<String> lore) {
@@ -58,27 +74,6 @@ public final class CombatLoreParser {
             values.merge(stat, attribute.value(), CombatLoreParser::sum);
         }
         return new CombatItemStats(values, invalidLines);
-    }
-
-    private static NumericRange sum(NumericRange first, NumericRange second) {
-        return new NumericRange(
-                first.minimum() + second.minimum(),
-                first.maximum() + second.maximum(),
-                first.percent() || second.percent()
-        );
-    }
-
-    private static String validate(CombatStat stat, NumericRange value) {
-        if (value.minimum() <= 0.0D || value.maximum() <= 0.0D) {
-            return "属性数值必须为正数";
-        }
-        if (!stat.percentageAttribute() && value.percent()) {
-            return "该属性不应带百分号";
-        }
-        if (value.maximum() > MAX_ATTRIBUTE_VALUE) {
-            return "属性数值超过安全上限";
-        }
-        return null;
     }
 
     private String normalize(String label) {

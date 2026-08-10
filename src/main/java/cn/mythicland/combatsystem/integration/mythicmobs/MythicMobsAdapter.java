@@ -52,6 +52,10 @@ public final class MythicMobsAdapter {
         }
     }
 
+    private static MythicMobsAdapter disabled() {
+        return new MythicMobsAdapter(null, null, null);
+    }
+
     /**
      * Indicates whether the optional API was resolved successfully.
      *
@@ -83,9 +87,5 @@ public final class MythicMobsAdapter {
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return Optional.empty();
         }
-    }
-
-    private static MythicMobsAdapter disabled() {
-        return new MythicMobsAdapter(null, null, null);
     }
 }

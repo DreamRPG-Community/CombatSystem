@@ -3,6 +3,7 @@ package cn.mythicland.combatsystem;
 import cn.mythicland.combatsystem.actionbar.CombatHealthBarService;
 import cn.mythicland.combatsystem.api.CombatApi;
 import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
+import cn.mythicland.combatsystem.config.CombatConfiguration;
 import cn.mythicland.combatsystem.config.CombatSettings;
 import cn.mythicland.combatsystem.integration.mythicmobs.MythicMobsAdapter;
 import cn.mythicland.combatsystem.listener.CombatListener;
@@ -12,8 +13,6 @@ import cn.mythicland.lib.bootstrap.LibPluginLifecycle;
 import cn.mythicland.lib.bootstrap.PluginTaskScope;
 import cn.mythicland.lib.bootstrap.annotation.LifecycleComponent;
 import cn.mythicland.lib.bootstrap.annotation.ServiceComponent;
-import cn.mythicland.lib.config.ConfigSupport;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -30,6 +29,7 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
 
     private final CombatSystemPlugin plugin;
     private final PluginTaskScope tasks;
+    private final CombatConfiguration configuration;
     private CombatSettings settings;
     private CombatStatsService statsService;
     private CombatHealthBarService healthBarService;
@@ -42,9 +42,14 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
      *
      * @param plugin plugin entry point
      */
-    public CombatSystemLifecycle(CombatSystemPlugin plugin, PluginTaskScope tasks) {
+    public CombatSystemLifecycle(
+            CombatSystemPlugin plugin,
+            PluginTaskScope tasks,
+            CombatConfiguration configuration
+    ) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.tasks = Objects.requireNonNull(tasks, "tasks");
+        this.configuration = Objects.requireNonNull(configuration, "configuration");
     }
 
     /**
@@ -52,7 +57,7 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
      */
     @Override
     public void enable() {
-        settings = CombatSettings.load(plugin, ConfigSupport.loadDefault(plugin));
+        settings = configuration.snapshot();
         statsService = new CombatStatsService(plugin, settings);
         MythicMobsAdapter mythicMobsAdapter = MythicMobsAdapter.detect();
         healthBarService = new CombatHealthBarService(mythicMobsAdapter);
@@ -129,8 +134,7 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
      * Reloads the plugin configuration.
      */
     public void reloadConfiguration() {
-        FileConfiguration configuration = ConfigSupport.loadDefault(plugin);
-        CombatSettings refreshedSettings = CombatSettings.load(plugin, configuration);
+        CombatSettings refreshedSettings = configuration.snapshot();
         settings = refreshedSettings;
         Objects.requireNonNull(statsService, "Combat stats service is unavailable")
                 .reload(refreshedSettings);

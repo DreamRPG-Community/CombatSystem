@@ -1,10 +1,6 @@
 package cn.mythicland.combatsystem.config;
 
 import cn.mythicland.combatsystem.lore.CombatStat;
-import cn.mythicland.lib.config.ConfigSupport;
-import cn.mythicland.lib.text.LegacyText;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -30,7 +26,7 @@ public final class CombatSettings {
         this(feedbackEnabled, labels, CombatMessages.defaults());
     }
 
-    private CombatSettings(
+    CombatSettings(
             boolean feedbackEnabled,
             Map<CombatStat, String> labels,
             CombatMessages messages
@@ -41,44 +37,6 @@ public final class CombatSettings {
         copy.putAll(labels);
         this.labels = Collections.unmodifiableMap(copy);
         this.messages = Objects.requireNonNull(messages, "messages");
-    }
-
-    /**
-     * Loads and validates CombatSystem configuration.
-     *
-     * @param plugin        the owning plugin
-     * @param configuration the loaded configuration
-     * @return immutable settings
-     */
-    public static CombatSettings load(JavaPlugin plugin, FileConfiguration configuration) {
-        EnumMap<CombatStat, String> labels = new EnumMap<>(CombatStat.class);
-        for (CombatStat stat : CombatStat.values()) {
-            String labelPath = "labels." + stat.configKey();
-            String label = ConfigSupport.getString(
-                    plugin,
-                    configuration,
-                    labelPath,
-                    defaultLabel(stat)
-            );
-            String visibleLabel = LegacyText.stripColor(label).trim();
-            if (visibleLabel.isBlank()) {
-                ConfigSupport.resetToDefault(
-                        plugin,
-                        configuration,
-                        labelPath,
-                        defaultLabel(stat),
-                        "expected a visible label"
-                );
-                label = defaultLabel(stat);
-                visibleLabel = label;
-            }
-            labels.put(stat, visibleLabel);
-        }
-        return new CombatSettings(
-                ConfigSupport.getBoolean(plugin, configuration, "combat-feedback", false),
-                labels,
-                CombatMessages.load(plugin, configuration)
-        );
     }
 
     /**
@@ -130,7 +88,4 @@ public final class CombatSettings {
         return messages.healthRegen(amount);
     }
 
-    private static String defaultLabel(CombatStat stat) {
-        return stat.defaultDisplayName();
-    }
 }
