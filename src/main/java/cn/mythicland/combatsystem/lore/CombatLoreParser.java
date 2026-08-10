@@ -17,17 +17,16 @@ public final class CombatLoreParser {
 
     private static final double MAX_ATTRIBUTE_VALUE = 1_000_000_000.0D;
 
-    private final CombatSettings settings;
     private final Map<String, CombatStat> aliases;
 
     public CombatLoreParser(CombatSettings settings) {
-        this.settings = Objects.requireNonNull(settings, "settings");
+        CombatSettings validatedSettings = Objects.requireNonNull(settings, "settings");
         Map<String, CombatStat> mutableAliases = new HashMap<>();
         for (CombatStat stat : CombatStat.values()) {
             for (String alias : stat.aliases()) {
                 mutableAliases.putIfAbsent(normalize(alias), stat);
             }
-            mutableAliases.putIfAbsent(normalize(settings.labelText(stat)), stat);
+            mutableAliases.putIfAbsent(normalize(validatedSettings.labelText(stat)), stat);
         }
         aliases = Map.copyOf(mutableAliases);
     }

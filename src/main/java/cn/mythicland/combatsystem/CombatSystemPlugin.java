@@ -24,6 +24,7 @@ public final class CombatSystemPlugin extends JavaPlugin {
      * Starts the Lib-managed CombatSystem component graph.
      */
     @Override
+    @SuppressWarnings("resource")
     public void onEnable() {
         try {
             LibApi lib = LibApi.require(this);

@@ -2,20 +2,21 @@ package cn.mythicland.combatsystem;
 
 import cn.mythicland.combatsystem.actionbar.CombatHealthBarService;
 import cn.mythicland.combatsystem.api.CombatApi;
-import cn.mythicland.combatsystem.command.CombatCommand;
+import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
 import cn.mythicland.combatsystem.config.CombatSettings;
 import cn.mythicland.combatsystem.integration.mythicmobs.MythicMobsAdapter;
 import cn.mythicland.combatsystem.listener.CombatListener;
+import cn.mythicland.combatsystem.lore.CombatItemStats;
 import cn.mythicland.combatsystem.stats.CombatStatsService;
-import cn.mythicland.lib.api.LibApi;
 import cn.mythicland.lib.bootstrap.LibPluginLifecycle;
-import cn.mythicland.lib.bootstrap.annotation.InjectComponent;
-import cn.mythicland.lib.command.CommandRouter;
+import cn.mythicland.lib.bootstrap.PluginTaskScope;
+import cn.mythicland.lib.bootstrap.annotation.LifecycleComponent;
+import cn.mythicland.lib.bootstrap.annotation.ServiceComponent;
 import cn.mythicland.lib.config.ConfigSupport;
-import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.ServicePriority;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Objects;
@@ -23,11 +24,12 @@ import java.util.Objects;
 /**
  * Owns CombatSystem construction, Bukkit registration, tasks, and reload state.
  */
-@InjectComponent
-public final class CombatSystemLifecycle implements LibPluginLifecycle {
+@LifecycleComponent
+@ServiceComponent(CombatApi.class)
+public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatApi {
 
     private final CombatSystemPlugin plugin;
-    private final LibApi lib;
+    private final PluginTaskScope tasks;
     private CombatSettings settings;
     private CombatStatsService statsService;
     private CombatHealthBarService healthBarService;
@@ -39,11 +41,10 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle {
      * Creates the lifecycle module from Lib-provided dependencies.
      *
      * @param plugin plugin entry point
-     * @param lib shared Lib service
      */
-    public CombatSystemLifecycle(CombatSystemPlugin plugin, LibApi lib) {
+    public CombatSystemLifecycle(CombatSystemPlugin plugin, PluginTaskScope tasks) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
-        this.lib = Objects.requireNonNull(lib, "lib");
+        this.tasks = Objects.requireNonNull(tasks, "tasks");
     }
 
     /**
@@ -56,17 +57,10 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle {
         MythicMobsAdapter mythicMobsAdapter = MythicMobsAdapter.detect();
         healthBarService = new CombatHealthBarService(mythicMobsAdapter);
         if (mythicMobsAdapter.isAvailable()) plugin.getLogger().info("MythicMobs compatibility enabled.");
-        listener = new CombatListener(plugin, lib, statsService, healthBarService);
+        listener = new CombatListener(plugin, tasks, statsService, healthBarService);
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
-        plugin.getServer().getServicesManager().register(
-                CombatApi.class,
-                statsService,
-                plugin,
-                ServicePriority.Normal
-        );
-        registerCommand();
-        regenerationTask = lib.runTimer(20L, 20L, listener::regenerateOnlinePlayers);
-        healthBarTask = lib.runTimer(10L, 10L, healthBarService::refreshOnlinePlayers);
+        regenerationTask = tasks.runTimer(20L, 20L, listener::regenerateOnlinePlayers);
+        healthBarTask = tasks.runTimer(10L, 10L, healthBarService::refreshOnlinePlayers);
         listener.refreshOnlinePlayers();
         plugin.getLogger().info("CombatSystem enabled.");
     }
@@ -84,16 +78,13 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle {
      */
     @Override
     public void disable() {
-        if (regenerationTask != null) regenerationTask.cancel();
-        if (healthBarTask != null) healthBarTask.cancel();
+        tasks.cancel(regenerationTask);
+        tasks.cancel(healthBarTask);
         regenerationTask = null;
         healthBarTask = null;
         if (healthBarService != null) healthBarService.clearAll();
         if (listener != null) {
             for (Player player : plugin.getServer().getOnlinePlayers()) listener.removeHealthModifier(player);
-        }
-        if (statsService != null) {
-            plugin.getServer().getServicesManager().unregister(CombatApi.class, statsService);
         }
         listener = null;
         healthBarService = null;
@@ -111,6 +102,30 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle {
     }
 
     /**
+     * Returns the active stats service for annotation-driven commands.
+     *
+     * @return active combat stats service
+     */
+    public CombatStatsService statsService() {
+        return Objects.requireNonNull(statsService, "Combat stats service is unavailable");
+    }
+
+    @Override
+    public CombatStatsSnapshot getStats(Player player) {
+        return statsService().getStats(player);
+    }
+
+    @Override
+    public CombatStatsSnapshot getStats(LivingEntity entity) {
+        return statsService().getStats(entity);
+    }
+
+    @Override
+    public CombatItemStats parseItem(ItemStack itemStack) {
+        return statsService().parseItem(itemStack);
+    }
+
+    /**
      * Reloads the plugin configuration.
      */
     public void reloadConfiguration() {
@@ -122,14 +137,4 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle {
         Objects.requireNonNull(listener, "Combat listener is unavailable").refreshOnlinePlayers();
     }
 
-    private void registerCommand() {
-        PluginCommand command = Objects.requireNonNull(
-                plugin.getCommand(CombatSystemPlugin.COMMAND_NAME),
-                CombatSystemPlugin.COMMAND_NAME + " command is missing from plugin.yml"
-        );
-        CommandRouter router = lib.createCommandRouter(plugin, CombatSystemPlugin.COMMAND_NAME);
-        CombatCommand.register(router, plugin, statsService);
-        command.setExecutor(router);
-        command.setTabCompleter(router);
-    }
 }

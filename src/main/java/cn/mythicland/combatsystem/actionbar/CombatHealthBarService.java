@@ -58,10 +58,7 @@ public final class CombatHealthBarService {
         // Paper 1.12.2 exposes absorption only on Player, while this bar intentionally targets mobs.
         double absorption = 0.0D;
         double totalDamage = nonNegativeFinite(damage);
-        double healthDamage = Math.min(
-                currentHealth,
-                Math.max(0.0D, totalDamage - absorption)
-        );
+        double healthDamage = Math.clamp(totalDamage - absorption, 0.0D, currentHealth);
         double remainingAbsorption = Math.max(0.0D, absorption - totalDamage);
         CombatHealthBarStatus status = CombatHealthBarStatus.builder()
                 .targetUniqueId(target.getUniqueId())

@@ -5,7 +5,7 @@ import cn.mythicland.combatsystem.actionbar.CombatHealthBarService;
 import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
 import cn.mythicland.combatsystem.combat.CombatFormula;
 import cn.mythicland.combatsystem.stats.CombatStatsService;
-import cn.mythicland.lib.api.LibApi;
+import cn.mythicland.lib.bootstrap.PluginTaskScope;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -44,24 +44,27 @@ public final class CombatListener implements Listener {
     private static final String HEALTH_MODIFIER_NAME = "Combat Lore Health";
 
     private final CombatSystemPlugin plugin;
-    private final LibApi lib;
+    private final PluginTaskScope tasks;
     private final CombatStatsService statsService;
     private final CombatHealthBarService healthBarService;
     private final Set<UUID> queuedRefreshes = new HashSet<>();
 
     public CombatListener(
             CombatSystemPlugin plugin,
-            LibApi lib,
+            PluginTaskScope tasks,
             CombatStatsService statsService,
             CombatHealthBarService healthBarService
     ) {
         this.plugin = plugin;
-        this.lib = lib;
+        this.tasks = tasks;
         this.statsService = statsService;
         this.healthBarService = healthBarService;
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(
+            priority = EventPriority.HIGHEST,
+            ignoreCancelled = true
+    )
     public void onEntityDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof LivingEntity target)) return;
 
@@ -179,7 +182,7 @@ public final class CombatListener implements Listener {
     private void refresh(Player player) {
         UUID uniqueId = player.getUniqueId();
         if (!queuedRefreshes.add(uniqueId)) return;
-        lib.runLater(1L, () -> {
+        tasks.runLater(1L, () -> {
             queuedRefreshes.remove(uniqueId);
             if (!player.isOnline()) return;
             applyHealthModifier(player);

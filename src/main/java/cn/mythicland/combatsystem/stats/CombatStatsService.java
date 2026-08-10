@@ -65,11 +65,11 @@ public final class CombatStatsService implements CombatApi {
                 .damageMinimum(nonNegative(damageMinimum))
                 .damageMaximum(nonNegative(damageMaximum))
                 .hasDamage(hasDamage)
-                .defensePercent(clamp(defense, 0.0D, 100.0D))
+                .defensePercent(Math.clamp(defense, 0.0D, 100.0D))
                 .hasDefense(hasDefense)
                 .health(nonNegative(health))
-                .healthRegenPercent(clamp(healthRegen, 0.0D, 100.0D))
-                .critChancePercent(clamp(critChance, 0.0D, 100.0D))
+                .healthRegenPercent(Math.clamp(healthRegen, 0.0D, 100.0D))
+                .critChancePercent(Math.clamp(critChance, 0.0D, 100.0D))
                 .critDamagePercent(nonNegative(critDamage))
                 .build();
     }
@@ -93,10 +93,6 @@ public final class CombatStatsService implements CombatApi {
 
     private static double nonNegative(double value) {
         return Math.max(0.0D, value);
-    }
-
-    private static double clamp(double value, double minimum, double maximum) {
-        return Math.clamp(value, minimum, maximum);
     }
 
     private static String describe(NumericRange value) {

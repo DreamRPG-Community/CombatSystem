@@ -27,13 +27,11 @@ final class CombatHealthBarFormatter {
         int damageHearts = rawMaxHearts <= MAX_HEARTS
                 ? hearts(status.healthDamage())
                 : scaledHearts(status.healthDamage(), status.maxHealth(), maxHearts, true);
-        int visibleAbsorptionHearts = Math.min(
-                absorptionHearts,
-                Math.max(0, maxHearts - remainingHearts)
-        );
-        int visibleDamageHearts = Math.min(
+        int visibleAbsorptionHearts = Math.clamp(absorptionHearts, 0, maxHearts - remainingHearts);
+        int visibleDamageHearts = Math.clamp(
                 damageHearts,
-                Math.max(0, maxHearts - remainingHearts - visibleAbsorptionHearts)
+                0,
+                maxHearts - remainingHearts - visibleAbsorptionHearts
         );
         int emptyHearts = Math.max(
                 0,
@@ -49,7 +47,7 @@ final class CombatHealthBarFormatter {
 
     private static void appendHearts(StringBuilder builder, String color, int hearts) {
         if (hearts <= 0) return;
-        builder.append(color).append(HEART.repeat(hearts));
+        builder.append(color).repeat(HEART, hearts);
     }
 
     private static int hearts(double health) {
