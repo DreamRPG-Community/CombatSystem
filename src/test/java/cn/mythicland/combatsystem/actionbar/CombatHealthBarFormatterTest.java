@@ -50,9 +50,42 @@ class CombatHealthBarFormatterTest {
                 .expiresAtMillis(1L)
                 .build();
 
-        String expected = "大型怪物 &4" + "❤".repeat(20)
-                + "&c" + "❤".repeat(2)
-                + "&7" + "❤".repeat(18);
+        String expected = "大型怪物 &4" + "❤".repeat(5)
+                + "&c❤"
+                + "&7" + "❤".repeat(4);
         assertEquals(expected, CombatHealthBarFormatter.render(status));
+    }
+
+    @Test
+    void alwaysUsesTenHeartsAndScalesAbsorptionToTheSameCapacity() {
+        CombatHealthBarStatus status = CombatHealthBarStatus.builder()
+                .targetUniqueId(UUID.randomUUID())
+                .targetDisplayName("超大怪物")
+                .remainingHealth(60.0D)
+                .remainingAbsorption(20.0D)
+                .maxHealth(100.0D)
+                .healthDamage(10.0D)
+                .expiresAtMillis(1L)
+                .build();
+
+        assertEquals("超大怪物 &4" + "❤".repeat(6)
+                + "&e" + "❤".repeat(2)
+                + "&c❤"
+                + "&7❤", CombatHealthBarFormatter.render(status));
+    }
+
+    @Test
+    void capsAbsorptionAtTenHeartsWithoutExpandingTheBar() {
+        CombatHealthBarStatus status = CombatHealthBarStatus.builder()
+                .targetUniqueId(UUID.randomUUID())
+                .targetDisplayName("护盾怪物")
+                .remainingHealth(0.0D)
+                .remainingAbsorption(500.0D)
+                .maxHealth(100.0D)
+                .healthDamage(0.0D)
+                .expiresAtMillis(1L)
+                .build();
+
+        assertEquals("护盾怪物 &e" + "❤".repeat(10), CombatHealthBarFormatter.render(status));
     }
 }

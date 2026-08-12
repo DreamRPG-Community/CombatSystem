@@ -19,8 +19,12 @@ public final class CombatConfiguration implements ConfigurableComponent {
     private volatile CombatSettings snapshot;
 
     private static String visibleLabel(String value, CombatStat stat) {
+        return visibleLabel(value, stat.defaultDisplayName());
+    }
+
+    private static String visibleLabel(String value, String fallback) {
         String visible = LegacyText.stripColor(value).trim();
-        return visible.isBlank() ? stat.defaultDisplayName() : visible;
+        return visible.isBlank() ? fallback : visible;
     }
 
     /**
@@ -39,9 +43,14 @@ public final class CombatConfiguration implements ConfigurableComponent {
         labels.put(CombatStat.HEALTH_REGEN, visibleLabel(raw.healthRegenLabel(), CombatStat.HEALTH_REGEN));
         labels.put(CombatStat.CRIT_CHANCE, visibleLabel(raw.critChanceLabel(), CombatStat.CRIT_CHANCE));
         labels.put(CombatStat.CRIT_DAMAGE, visibleLabel(raw.critDamageLabel(), CombatStat.CRIT_DAMAGE));
+        labels.put(
+                CombatStat.EXPERIENCE_BONUS,
+                visibleLabel(raw.experienceBonusLabel(), CombatStat.EXPERIENCE_BONUS)
+        );
         snapshot = new CombatSettings(
                 raw.feedbackEnabled(),
                 labels,
+                visibleLabel(raw.levelRequirementLabel(), "需要等级"),
                 new CombatMessages(raw.criticalHitMessage(), raw.healthRegenMessage())
         );
     }
@@ -110,7 +119,19 @@ public final class CombatConfiguration implements ConfigurableComponent {
                     defaultValue = "暴击伤害",
                     nonBlank = true
             )
-            String critDamageLabel
+            String critDamageLabel,
+            @ConfigValue(
+                    path = "labels.experience-bonus",
+                    defaultValue = "经验加成",
+                    nonBlank = true
+            )
+            String experienceBonusLabel,
+            @ConfigValue(
+                    path = "labels.level-requirement",
+                    defaultValue = "需要等级",
+                    nonBlank = true
+            )
+            String levelRequirementLabel
     ) {
     }
 }

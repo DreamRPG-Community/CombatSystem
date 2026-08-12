@@ -4,6 +4,7 @@ import cn.mythicland.combatsystem.CombatSystemPlugin;
 import cn.mythicland.combatsystem.actionbar.CombatHealthBarService;
 import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
 import cn.mythicland.combatsystem.combat.CombatFormula;
+import cn.mythicland.combatsystem.combat.CombatHealthFormula;
 import cn.mythicland.combatsystem.stats.CombatStatsService;
 import cn.mythicland.lib.bootstrap.PluginTaskScope;
 import org.bukkit.Location;
@@ -129,47 +130,47 @@ public final class CombatListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        refresh(event.getPlayer());
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
-        refresh(event.getPlayer());
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onChangedWorld(PlayerChangedWorldEvent event) {
-        refresh(event.getPlayer());
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onHeldItem(PlayerItemHeldEvent event) {
-        refresh(event.getPlayer());
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onSwapHandItems(PlayerSwapHandItemsEvent event) {
-        refresh(event.getPlayer());
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player player) refresh(player);
+        if (event.getWhoClicked() instanceof Player player) refreshPlayer(player);
     }
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (event.getWhoClicked() instanceof Player player) refresh(player);
+        if (event.getWhoClicked() instanceof Player player) refreshPlayer(player);
     }
 
     @EventHandler
     public void onDrop(PlayerDropItemEvent event) {
-        refresh(event.getPlayer());
+        refreshPlayer(event.getPlayer());
     }
 
     @EventHandler
     public void onEntityPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player player) refresh(player);
+        if (event.getEntity() instanceof Player player) refreshPlayer(player);
     }
 
     @EventHandler
@@ -179,7 +180,7 @@ public final class CombatListener implements Listener {
     }
 
     public void refreshOnlinePlayers() {
-        for (Player player : plugin.getServer().getOnlinePlayers()) refresh(player);
+        for (Player player : plugin.getServer().getOnlinePlayers()) refreshPlayer(player);
     }
 
     public void regenerateOnlinePlayers() {
@@ -210,7 +211,13 @@ public final class CombatListener implements Listener {
         if (player.getHealth() > attribute.getValue()) player.setHealth(attribute.getValue());
     }
 
-    private void refresh(Player player) {
+    /**
+     * Recalculates the player's active CombatSystem health and level-gated attributes on the next
+     * server tick.
+     *
+     * @param player player to refresh
+     */
+    public void refreshPlayer(Player player) {
         UUID uniqueId = player.getUniqueId();
         if (!queuedRefreshes.add(uniqueId)) return;
         tasks.runLater(1L, () -> {
@@ -223,19 +230,32 @@ public final class CombatListener implements Listener {
     private void applyHealthModifier(Player player) {
         AttributeInstance attribute = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
         if (attribute == null) return;
+        double previousMaximumHealth = attribute.getValue();
+        double currentHealth = player.getHealth();
         AttributeModifier previous = findHealthModifier(attribute);
         if (previous != null) attribute.removeModifier(previous);
 
         CombatStatsSnapshot stats = statsService.getStats(player);
-        if (stats.health() > 0.0D) {
+        double baseMaximumHealth = attribute.getValue();
+        double desiredMaximumHealth = CombatHealthFormula.maximumHealth(baseMaximumHealth, stats.health());
+        double modifierAmount = desiredMaximumHealth - baseMaximumHealth;
+        if (Math.abs(modifierAmount) > 1.0E-9D) {
             attribute.addModifier(new AttributeModifier(
                     HEALTH_MODIFIER_ID,
                     HEALTH_MODIFIER_NAME,
-                    stats.health(),
+                    modifierAmount,
                     AttributeModifier.Operation.ADD_NUMBER
             ));
         }
-        if (player.getHealth() > attribute.getValue()) player.setHealth(attribute.getValue());
+        double newMaximumHealth = attribute.getValue();
+        double synchronizedHealth = CombatHealthFormula.synchronizedCurrentHealth(
+                currentHealth,
+                previousMaximumHealth,
+                newMaximumHealth
+        );
+        if (Double.compare(currentHealth, synchronizedHealth) != 0) {
+            player.setHealth(synchronizedHealth);
+        }
     }
 
 }

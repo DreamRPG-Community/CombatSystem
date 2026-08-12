@@ -34,19 +34,61 @@ class CombatLoreParserTest {
     }
 
     @Test
-    void rejectsNegativeDefenseAndPercentageDamage() {
+    void acceptsSignedValuesAndKeepsPercentageValidation() {
         CombatLoreParser parser = new CombatLoreParser(defaultSettings());
 
         CombatItemStats result = parser.parse(List.of(
                 "§b防御: §2-23%",
                 "§4伤害: §2+50%",
-                "§2生命回复: §2+5%"
+                "§2生命回复: §2-5%",
+                "§d经验加成: §2-50%",
+                "§a生命值: §2-100",
+                "§c暴击几率: §2-20%",
+                "§4暴击伤害: §2-50%"
         ));
 
-        assertFalse(result.has(CombatStat.DEFENSE));
+        assertTrue(result.has(CombatStat.DEFENSE));
         assertFalse(result.has(CombatStat.DAMAGE));
         assertTrue(result.has(CombatStat.HEALTH_REGEN));
-        assertEquals(2, result.invalidLines().size());
+        assertEquals(-23.0D, result.value(CombatStat.DEFENSE).orElseThrow().minimum());
+        assertEquals(-5.0D, result.value(CombatStat.HEALTH_REGEN).orElseThrow().minimum());
+        assertEquals(-50.0D, result.value(CombatStat.EXPERIENCE_BONUS).orElseThrow().minimum());
+        assertEquals(-100.0D, result.value(CombatStat.HEALTH).orElseThrow().minimum());
+        assertEquals(-20.0D, result.value(CombatStat.CRIT_CHANCE).orElseThrow().minimum());
+        assertEquals(-50.0D, result.value(CombatStat.CRIT_DAMAGE).orElseThrow().minimum());
+        assertEquals(1, result.invalidLines().size());
+    }
+
+    @Test
+    void acceptsLevelAliasesAndUsesTheHighestRequirement() {
+        CombatLoreParser parser = new CombatLoreParser(defaultSettings());
+
+        CombatItemStats result = parser.parse(List.of(
+                "等级限制: 200级",
+                "装备等级: 250",
+                "等级: 300",
+                "需要等级: 350",
+                "伤害: 0"
+        ));
+
+        assertEquals(350L, result.requiredLevel());
+        assertTrue(result.hasRequiredLevel());
+        assertEquals(0.0D, result.value(CombatStat.DAMAGE).orElseThrow().minimum());
+        assertTrue(result.invalidLines().isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidLevelRequirements() {
+        CombatLoreParser parser = new CombatLoreParser(defaultSettings());
+
+        CombatItemStats result = parser.parse(List.of(
+                "等级限制: -1",
+                "装备等级: 20.5",
+                "等级: 30%"
+        ));
+
+        assertFalse(result.hasRequiredLevel());
+        assertEquals(3, result.invalidLines().size());
     }
 
     @Test

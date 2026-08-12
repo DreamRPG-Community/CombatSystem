@@ -1,0 +1,130 @@
+package cn.mythicland.combatsystem.integration.dreamrpg;
+
+import cn.mythicland.combatsystem.CombatSystemPlugin;
+import cn.mythicland.combatsystem.combat.CombatFormula;
+import cn.mythicland.combatsystem.listener.CombatListener;
+import cn.mythicland.combatsystem.stats.CombatStatsService;
+import cn.mythicland.dreamrpg.api.*;
+import cn.mythicland.dreamrpg.event.PlayerDataReadyEvent;
+import cn.mythicland.dreamrpg.event.RpgLevelUpEvent;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.RegisteredServiceProvider;
+
+import java.math.BigDecimal;
+import java.util.Objects;
+import java.util.OptionalLong;
+import java.util.UUID;
+
+/**
+ * Optional DreamRPG bridge for level-gated CombatSystem attributes and item experience bonuses.
+ */
+public final class DreamRpgExperienceIntegration implements Listener, AutoCloseable {
+
+    private static final String MODIFIER_ID = "combatsystem-item-experience";
+
+    private final CombatSystemPlugin plugin;
+    private final ExperienceApi experience;
+    private Registration modifierRegistration;
+    private CombatListener combatListener;
+
+    private DreamRpgExperienceIntegration(CombatSystemPlugin plugin, ExperienceApi experience) {
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.experience = Objects.requireNonNull(experience, "experience");
+    }
+
+    /**
+     * Finds DreamRPG's public service without making it a hard runtime dependency.
+     *
+     * @param plugin owning CombatSystem plugin
+     * @return integration instance, or {@code null} when the service is unavailable
+     */
+    public static DreamRpgExperienceIntegration detect(CombatSystemPlugin plugin) {
+        Objects.requireNonNull(plugin, "plugin");
+        RegisteredServiceProvider<ExperienceApi> registration = plugin.getServer()
+                .getServicesManager()
+                .getRegistration(ExperienceApi.class);
+        if (registration == null || registration.getProvider() == null) {
+            plugin.getLogger().warning("DreamRPG is enabled but ExperienceApi is unavailable; "
+                    + "level restrictions and item experience bonuses are disabled.");
+            return null;
+        }
+        return new DreamRpgExperienceIntegration(plugin, registration.getProvider());
+    }
+
+    /**
+     * Returns the ready DreamRPG level for one player.
+     *
+     * @param uniqueId player UUID
+     * @return RPG level, or empty while DreamRPG data is not ready
+     */
+    public OptionalLong rpgLevel(UUID uniqueId) {
+        Objects.requireNonNull(uniqueId, "uniqueId");
+        if (!experience.isReady(uniqueId)) return OptionalLong.empty();
+        ExperienceSnapshot snapshot = experience.snapshot(uniqueId);
+        if (!snapshot.ready()) return OptionalLong.empty();
+        return OptionalLong.of(snapshot.level());
+    }
+
+    /**
+     * Registers the item modifier and DreamRPG lifecycle event listeners.
+     *
+     * @param listener CombatSystem listener to refresh after RPG state changes
+     * @param stats    CombatSystem stats service used by the modifier
+     */
+    public void enable(CombatListener listener, CombatStatsService stats) {
+        if (modifierRegistration != null) throw new IllegalStateException("DreamRPG integration is enabled");
+        combatListener = Objects.requireNonNull(listener, "listener");
+        CombatStatsService service = Objects.requireNonNull(stats, "stats");
+        modifierRegistration = experience.registerModifier(new ItemExperienceModifier(service));
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        plugin.getLogger().info("DreamRPG experience integration enabled.");
+    }
+
+    @EventHandler
+    public void onPlayerDataReady(PlayerDataReadyEvent event) {
+        refresh(event.uniqueId());
+    }
+
+    @EventHandler
+    public void onRpgLevelUp(RpgLevelUpEvent event) {
+        refresh(event.uniqueId());
+    }
+
+    /**
+     * Unregisters the external modifier and event listeners.
+     */
+    @Override
+    public void close() {
+        HandlerList.unregisterAll(this);
+        if (modifierRegistration != null) modifierRegistration.close();
+        modifierRegistration = null;
+        combatListener = null;
+    }
+
+    private void refresh(UUID uniqueId) {
+        CombatListener listener = combatListener;
+        if (listener == null) return;
+        Player player = Bukkit.getPlayer(uniqueId);
+        if (player != null && player.isOnline()) listener.refreshPlayer(player);
+    }
+
+    private record ItemExperienceModifier(CombatStatsService statsService) implements ExperienceModifier {
+
+        @Override
+        public String id() {
+            return MODIFIER_ID;
+        }
+
+        @Override
+        public BigDecimal multiplier(ExperienceModifierContext context) {
+            Player player = Bukkit.getPlayer(context.uniqueId());
+            if (player == null || !player.isOnline()) return BigDecimal.ONE;
+            double bonus = statsService.getStats(player).experienceBonusPercent();
+            return BigDecimal.valueOf(CombatFormula.experienceMultiplier(bonus));
+        }
+    }
+}

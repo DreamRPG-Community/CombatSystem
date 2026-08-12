@@ -18,18 +18,20 @@ public final class CombatStatsSnapshot {
     private final double healthRegenPercent;
     private final double critChancePercent;
     private final double critDamagePercent;
+    private final double experienceBonusPercent;
 
     private CombatStatsSnapshot(Builder builder) {
-        validateNonNegative(builder.damageMinimum, "damageMinimum");
-        validateNonNegative(builder.damageMaximum, "damageMaximum");
+        validateFinite(builder.damageMinimum, "damageMinimum");
+        validateFinite(builder.damageMaximum, "damageMaximum");
         if (builder.damageMinimum > builder.damageMaximum) {
             throw new IllegalArgumentException("damageMinimum cannot exceed damageMaximum");
         }
-        validateNonNegative(builder.defensePercent, "defensePercent");
-        validateNonNegative(builder.health, "health");
-        validateNonNegative(builder.healthRegenPercent, "healthRegenPercent");
-        validateNonNegative(builder.critChancePercent, "critChancePercent");
-        validateNonNegative(builder.critDamagePercent, "critDamagePercent");
+        validateRange(builder.defensePercent, -100.0D, 100.0D, "defensePercent");
+        validateFinite(builder.health, "health");
+        validateRange(builder.healthRegenPercent, 0.0D, 100.0D, "healthRegenPercent");
+        validateRange(builder.critChancePercent, 0.0D, 100.0D, "critChancePercent");
+        validateFinite(builder.critDamagePercent, "critDamagePercent");
+        validateFinite(builder.experienceBonusPercent, "experienceBonusPercent");
 
         damageMinimum = builder.damageMinimum;
         damageMaximum = builder.damageMaximum;
@@ -40,6 +42,7 @@ public final class CombatStatsSnapshot {
         healthRegenPercent = builder.healthRegenPercent;
         critChancePercent = builder.critChancePercent;
         critDamagePercent = builder.critDamagePercent;
+        experienceBonusPercent = builder.experienceBonusPercent;
     }
 
     /**
@@ -61,9 +64,16 @@ public final class CombatStatsSnapshot {
         return builder().build();
     }
 
-    private static void validateNonNegative(double value, String name) {
-        if (!Double.isFinite(value) || value < 0.0D) {
-            throw new IllegalArgumentException(name + " must be finite and non-negative");
+    private static void validateFinite(double value, String name) {
+        if (!Double.isFinite(value)) throw new IllegalArgumentException(name + " must be finite");
+    }
+
+    private static void validateRange(double value, double minimum, double maximum, String name) {
+        validateFinite(value, name);
+        if (value < minimum || value > maximum) {
+            throw new IllegalArgumentException(
+                    name + " must be between " + minimum + " and " + maximum
+            );
         }
     }
 
@@ -109,6 +119,15 @@ public final class CombatStatsSnapshot {
     }
 
     /**
+     * Returns the signed experience percentage contributed by active equipment.
+     *
+     * @return signed experience percentage
+     */
+    public double experienceBonusPercent() {
+        return experienceBonusPercent;
+    }
+
+    /**
      * Returns a value by public stat identifier.
      *
      * @param stat the requested attribute
@@ -122,6 +141,7 @@ public final class CombatStatsSnapshot {
             case HEALTH_REGEN -> healthRegenPercent;
             case CRIT_CHANCE -> critChancePercent;
             case CRIT_DAMAGE -> critDamagePercent;
+            case EXPERIENCE_BONUS -> experienceBonusPercent;
         };
     }
 
@@ -137,7 +157,8 @@ public final class CombatStatsSnapshot {
                 && Double.compare(health, snapshot.health) == 0
                 && Double.compare(healthRegenPercent, snapshot.healthRegenPercent) == 0
                 && Double.compare(critChancePercent, snapshot.critChancePercent) == 0
-                && Double.compare(critDamagePercent, snapshot.critDamagePercent) == 0;
+                && Double.compare(critDamagePercent, snapshot.critDamagePercent) == 0
+                && Double.compare(experienceBonusPercent, snapshot.experienceBonusPercent) == 0;
     }
 
     @Override
@@ -151,7 +172,8 @@ public final class CombatStatsSnapshot {
                 health,
                 healthRegenPercent,
                 critChancePercent,
-                critDamagePercent
+                critDamagePercent,
+                experienceBonusPercent
         );
     }
 
@@ -167,6 +189,7 @@ public final class CombatStatsSnapshot {
                 + ", healthRegenPercent=" + healthRegenPercent
                 + ", critChancePercent=" + critChancePercent
                 + ", critDamagePercent=" + critDamagePercent
+                + ", experienceBonusPercent=" + experienceBonusPercent
                 + ']';
     }
 
@@ -184,6 +207,7 @@ public final class CombatStatsSnapshot {
         private double healthRegenPercent;
         private double critChancePercent;
         private double critDamagePercent;
+        private double experienceBonusPercent;
 
         private Builder() {
         }
@@ -230,6 +254,11 @@ public final class CombatStatsSnapshot {
 
         public Builder critDamagePercent(double value) {
             critDamagePercent = value;
+            return this;
+        }
+
+        public Builder experienceBonusPercent(double value) {
+            experienceBonusPercent = value;
             return this;
         }
 

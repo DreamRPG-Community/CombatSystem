@@ -14,6 +14,7 @@ public final class CombatSettings {
 
     private final boolean feedbackEnabled;
     private final Map<CombatStat, String> labels;
+    private final String levelRequirementLabel;
     private final CombatMessages messages;
 
     /**
@@ -23,12 +24,13 @@ public final class CombatSettings {
      * @param labels          configured visible labels without color codes
      */
     public CombatSettings(boolean feedbackEnabled, Map<CombatStat, String> labels) {
-        this(feedbackEnabled, labels, CombatMessages.defaults());
+        this(feedbackEnabled, labels, "需要等级", CombatMessages.defaults());
     }
 
     CombatSettings(
             boolean feedbackEnabled,
             Map<CombatStat, String> labels,
+            String levelRequirementLabel,
             CombatMessages messages
     ) {
         this.feedbackEnabled = feedbackEnabled;
@@ -36,6 +38,7 @@ public final class CombatSettings {
         EnumMap<CombatStat, String> copy = new EnumMap<>(CombatStat.class);
         copy.putAll(labels);
         this.labels = Collections.unmodifiableMap(copy);
+        this.levelRequirementLabel = Objects.requireNonNull(levelRequirementLabel, "levelRequirementLabel");
         this.messages = Objects.requireNonNull(messages, "messages");
     }
 
@@ -66,6 +69,15 @@ public final class CombatSettings {
      */
     public String labelText(CombatStat stat) {
         return label(stat);
+    }
+
+    /**
+     * Returns the configured item level-requirement label.
+     *
+     * @return visible level-requirement label without color codes
+     */
+    public String levelRequirementLabel() {
+        return levelRequirementLabel;
     }
 
     /**

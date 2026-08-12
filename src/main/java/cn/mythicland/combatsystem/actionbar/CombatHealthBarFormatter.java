@@ -2,11 +2,12 @@ package cn.mythicland.combatsystem.actionbar;
 
 /**
  * Renders the temporary target health bar in legacy text format.
+ * Every target uses a fixed ten-heart capacity; health, absorption and damage
+ * are scaled against the target's maximum health before rendering.
  */
 final class CombatHealthBarFormatter {
 
-    private static final double HEALTH_PER_HEART = 2.0D;
-    private static final int MAX_HEARTS = 40;
+    private static final int DISPLAY_HEARTS = 10;
     private static final String HEART = "❤";
 
     private CombatHealthBarFormatter() {
@@ -16,26 +17,22 @@ final class CombatHealthBarFormatter {
         StringBuilder builder = new StringBuilder(trimTrailingWhitespace(status.targetDisplayName()));
         builder.append(" ");
 
-        int rawMaxHearts = Math.max(1, hearts(status.maxHealth()));
-        int maxHearts = Math.min(MAX_HEARTS, rawMaxHearts);
-        int remainingHearts = rawMaxHearts <= MAX_HEARTS
-                ? Math.min(hearts(status.remainingHealth()), maxHearts)
-                : scaledHearts(status.remainingHealth(), status.maxHealth(), maxHearts, false);
-        int absorptionHearts = rawMaxHearts <= MAX_HEARTS
-                ? hearts(status.remainingAbsorption())
-                : scaledHearts(status.remainingAbsorption(), status.maxHealth(), maxHearts, true);
-        int damageHearts = rawMaxHearts <= MAX_HEARTS
-                ? hearts(status.healthDamage())
-                : scaledHearts(status.healthDamage(), status.maxHealth(), maxHearts, true);
-        int visibleAbsorptionHearts = Math.clamp(absorptionHearts, 0, maxHearts - remainingHearts);
+        int remainingHearts = scaledHearts(status.remainingHealth(), status.maxHealth(), false);
+        int absorptionHearts = scaledHearts(status.remainingAbsorption(), status.maxHealth(), true);
+        int damageHearts = scaledHearts(status.healthDamage(), status.maxHealth(), true);
+        int visibleAbsorptionHearts = Math.clamp(
+                absorptionHearts,
+                0,
+                DISPLAY_HEARTS - remainingHearts
+        );
         int visibleDamageHearts = Math.clamp(
                 damageHearts,
                 0,
-                maxHearts - remainingHearts - visibleAbsorptionHearts
+                DISPLAY_HEARTS - remainingHearts - visibleAbsorptionHearts
         );
         int emptyHearts = Math.max(
                 0,
-                maxHearts - remainingHearts - visibleAbsorptionHearts - visibleDamageHearts
+                DISPLAY_HEARTS - remainingHearts - visibleAbsorptionHearts - visibleDamageHearts
         );
 
         appendHearts(builder, "&4", remainingHearts);
@@ -50,18 +47,9 @@ final class CombatHealthBarFormatter {
         builder.append(color).repeat(HEART, hearts);
     }
 
-    private static int hearts(double health) {
-        return (int) Math.ceil(Math.max(0.0D, health) / HEALTH_PER_HEART);
-    }
-
-    private static int scaledHearts(
-            double value,
-            double maxValue,
-            int maxHearts,
-            boolean roundUp
-    ) {
+    private static int scaledHearts(double value, double maxValue, boolean roundUp) {
         double ratio = Math.clamp(value / maxValue, 0.0D, 1.0D);
-        double scaled = ratio * maxHearts;
+        double scaled = ratio * DISPLAY_HEARTS;
         return (int) (roundUp ? Math.ceil(scaled) : Math.floor(scaled));
     }
 

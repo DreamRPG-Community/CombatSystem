@@ -15,3 +15,5 @@ labels:
   health-regen: "生命回复"
   crit-chance: "暴击几率"
   crit-damage: "暴击伤害"
+  experience-bonus: "经验加成"
+  level-requirement: "需要等级"

@@ -40,7 +40,12 @@ public final class CombatCommand {
 
         CombatStatsService statsService = lifecycle.statsService();
         CombatStatsSnapshot stats = statsService.getStats(player);
-        for (String line : CombatStatsDisplay.render(stats)) context.sender().sendMessage(line);
+        for (String line : CombatStatsDisplay.render(stats, lifecycle.settings())) {
+            context.sender().sendMessage(line);
+        }
+        for (String line : statsService.levelRequirementDisplay(player)) {
+            context.sender().sendMessage(ChatColor.GRAY + line);
+        }
     }
 
     @CommandHandler(value = "reload", permission = ADMIN_PERMISSION)

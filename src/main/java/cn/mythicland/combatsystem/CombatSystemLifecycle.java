@@ -5,6 +5,7 @@ import cn.mythicland.combatsystem.api.CombatApi;
 import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
 import cn.mythicland.combatsystem.config.CombatConfiguration;
 import cn.mythicland.combatsystem.config.CombatSettings;
+import cn.mythicland.combatsystem.integration.dreamrpg.DreamRpgExperienceIntegration;
 import cn.mythicland.combatsystem.integration.mythicmobs.MythicMobsAdapter;
 import cn.mythicland.combatsystem.listener.CombatListener;
 import cn.mythicland.combatsystem.lore.CombatItemStats;
@@ -34,6 +35,7 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
     private CombatStatsService statsService;
     private CombatHealthBarService healthBarService;
     private CombatListener listener;
+    private DreamRpgExperienceIntegration experienceIntegration;
     private BukkitTask regenerationTask;
     private BukkitTask healthBarTask;
 
@@ -58,12 +60,21 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
     @Override
     public void enable() {
         settings = configuration.snapshot();
-        statsService = new CombatStatsService(plugin, settings);
+        experienceIntegration = null;
+        if (plugin.getServer().getPluginManager().isPluginEnabled("DreamRPG")) {
+            experienceIntegration = DreamRpgExperienceIntegration.detect(plugin);
+        }
+        statsService = new CombatStatsService(
+                plugin,
+                settings,
+                experienceIntegration == null ? null : experienceIntegration::rpgLevel
+        );
         MythicMobsAdapter mythicMobsAdapter = MythicMobsAdapter.detect();
         healthBarService = new CombatHealthBarService(mythicMobsAdapter);
         if (mythicMobsAdapter.isAvailable()) plugin.getLogger().info("MythicMobs compatibility enabled.");
         listener = new CombatListener(plugin, tasks, statsService, healthBarService);
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
+        if (experienceIntegration != null) experienceIntegration.enable(listener, statsService);
         regenerationTask = tasks.runTimer(20L, 20L, listener::regenerateOnlinePlayers);
         healthBarTask = tasks.runTimer(10L, 10L, healthBarService::refreshOnlinePlayers);
         listener.refreshOnlinePlayers();
@@ -88,6 +99,8 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
         regenerationTask = null;
         healthBarTask = null;
         if (healthBarService != null) healthBarService.clearAll();
+        if (experienceIntegration != null) experienceIntegration.close();
+        experienceIntegration = null;
         if (listener != null) {
             for (Player player : plugin.getServer().getOnlinePlayers()) listener.removeHealthModifier(player);
         }

@@ -4,7 +4,7 @@ main: cn.mythicland.combatsystem.CombatSystemPlugin
 author: ShanguanLinG
 load: POSTWORLD
 depend: [ Lib ]
-softdepend: [ MythicMobs ]
+softdepend: [ MythicMobs, DreamRPG ]
 description: Simple RPG combat attributes from legacy item lore.
 
 commands:
