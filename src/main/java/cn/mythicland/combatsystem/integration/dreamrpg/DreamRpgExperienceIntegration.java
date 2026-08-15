@@ -16,6 +16,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 
@@ -28,12 +29,18 @@ public final class DreamRpgExperienceIntegration implements Listener, AutoClosea
 
     private final CombatSystemPlugin plugin;
     private final ExperienceApi experience;
+    private final HealthApi health;
     private Registration modifierRegistration;
     private CombatListener combatListener;
 
-    private DreamRpgExperienceIntegration(CombatSystemPlugin plugin, ExperienceApi experience) {
+    private DreamRpgExperienceIntegration(
+            CombatSystemPlugin plugin,
+            ExperienceApi experience,
+            HealthApi health
+    ) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.experience = Objects.requireNonNull(experience, "experience");
+        this.health = health;
     }
 
     /**
@@ -52,7 +59,14 @@ public final class DreamRpgExperienceIntegration implements Listener, AutoClosea
                     + "level restrictions and item experience bonuses are disabled.");
             return null;
         }
-        return new DreamRpgExperienceIntegration(plugin, registration.getProvider());
+        RegisteredServiceProvider<HealthApi> healthRegistration = plugin.getServer()
+                .getServicesManager()
+                .getRegistration(HealthApi.class);
+        HealthApi health = healthRegistration == null ? null : healthRegistration.getProvider();
+        if (health == null) {
+            plugin.getLogger().warning("DreamRPG HealthApi is unavailable; DreamRPG health will not be shown in stats.");
+        }
+        return new DreamRpgExperienceIntegration(plugin, registration.getProvider(), health);
     }
 
     /**
@@ -67,6 +81,18 @@ public final class DreamRpgExperienceIntegration implements Listener, AutoClosea
         ExperienceSnapshot snapshot = experience.snapshot(uniqueId);
         if (!snapshot.ready()) return OptionalLong.empty();
         return OptionalLong.of(snapshot.level());
+    }
+
+    /**
+     * Returns the ready DreamRPG health progression for one player.
+     *
+     * @param uniqueId player UUID
+     * @return health progression, or empty when the bridge is unavailable or not ready
+     */
+    public Optional<HealthSnapshot> rpgHealth(UUID uniqueId) {
+        Objects.requireNonNull(uniqueId, "uniqueId");
+        if (health == null) return Optional.empty();
+        return health.snapshot(uniqueId).filter(HealthSnapshot::enabled);
     }
 
     /**

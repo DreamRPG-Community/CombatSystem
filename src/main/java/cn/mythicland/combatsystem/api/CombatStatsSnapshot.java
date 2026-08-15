@@ -15,6 +15,8 @@ public final class CombatStatsSnapshot {
     private final double defensePercent;
     private final boolean hasDefense;
     private final double health;
+    private final double baseHealth;
+    private final double levelHealthBonus;
     private final double healthRegenPercent;
     private final double critChancePercent;
     private final double critDamagePercent;
@@ -28,6 +30,12 @@ public final class CombatStatsSnapshot {
         }
         validateRange(builder.defensePercent, -100.0D, 100.0D, "defensePercent");
         validateFinite(builder.health, "health");
+        validateRange(builder.baseHealth, 0.0D, Double.MAX_VALUE, "baseHealth");
+        validateRange(builder.levelHealthBonus, 0.0D, Double.MAX_VALUE, "levelHealthBonus");
+        validateFinite(
+                builder.baseHealth + builder.levelHealthBonus + builder.health,
+                "totalHealth"
+        );
         validateRange(builder.healthRegenPercent, 0.0D, 100.0D, "healthRegenPercent");
         validateRange(builder.critChancePercent, 0.0D, 100.0D, "critChancePercent");
         validateFinite(builder.critDamagePercent, "critDamagePercent");
@@ -39,6 +47,8 @@ public final class CombatStatsSnapshot {
         defensePercent = builder.defensePercent;
         hasDefense = builder.hasDefense;
         health = builder.health;
+        baseHealth = builder.baseHealth;
+        levelHealthBonus = builder.levelHealthBonus;
         healthRegenPercent = builder.healthRegenPercent;
         critChancePercent = builder.critChancePercent;
         critDamagePercent = builder.critDamagePercent;
@@ -101,6 +111,34 @@ public final class CombatStatsSnapshot {
         return health;
     }
 
+    /**
+     * Returns DreamRPG's configured health at RPG level zero, or zero when DreamRPG health is
+     * unavailable for this snapshot.
+     *
+     * @return configured base health
+     */
+    public double baseHealth() {
+        return baseHealth;
+    }
+
+    /**
+     * Returns the health added by the player's DreamRPG level, or zero when unavailable.
+     *
+     * @return level-based health contribution
+     */
+    public double levelHealthBonus() {
+        return levelHealthBonus;
+    }
+
+    /**
+     * Returns equipment health plus DreamRPG base and level-based health.
+     *
+     * @return effective health total represented by this snapshot
+     */
+    public double totalHealth() {
+        return baseHealth + levelHealthBonus + health;
+    }
+
     public double healthRegenPercent() {
         return healthRegenPercent;
     }
@@ -155,6 +193,8 @@ public final class CombatStatsSnapshot {
                 && Double.compare(defensePercent, snapshot.defensePercent) == 0
                 && hasDefense == snapshot.hasDefense
                 && Double.compare(health, snapshot.health) == 0
+                && Double.compare(baseHealth, snapshot.baseHealth) == 0
+                && Double.compare(levelHealthBonus, snapshot.levelHealthBonus) == 0
                 && Double.compare(healthRegenPercent, snapshot.healthRegenPercent) == 0
                 && Double.compare(critChancePercent, snapshot.critChancePercent) == 0
                 && Double.compare(critDamagePercent, snapshot.critDamagePercent) == 0
@@ -170,6 +210,8 @@ public final class CombatStatsSnapshot {
                 defensePercent,
                 hasDefense,
                 health,
+                baseHealth,
+                levelHealthBonus,
                 healthRegenPercent,
                 critChancePercent,
                 critDamagePercent,
@@ -186,6 +228,8 @@ public final class CombatStatsSnapshot {
                 + ", defensePercent=" + defensePercent
                 + ", hasDefense=" + hasDefense
                 + ", health=" + health
+                + ", baseHealth=" + baseHealth
+                + ", levelHealthBonus=" + levelHealthBonus
                 + ", healthRegenPercent=" + healthRegenPercent
                 + ", critChancePercent=" + critChancePercent
                 + ", critDamagePercent=" + critDamagePercent
@@ -204,6 +248,8 @@ public final class CombatStatsSnapshot {
         private double defensePercent;
         private boolean hasDefense;
         private double health;
+        private double baseHealth;
+        private double levelHealthBonus;
         private double healthRegenPercent;
         private double critChancePercent;
         private double critDamagePercent;
@@ -239,6 +285,16 @@ public final class CombatStatsSnapshot {
 
         public Builder health(double value) {
             health = value;
+            return this;
+        }
+
+        public Builder baseHealth(double value) {
+            baseHealth = value;
+            return this;
+        }
+
+        public Builder levelHealthBonus(double value) {
+            levelHealthBonus = value;
             return this;
         }
 

@@ -3,11 +3,13 @@ package cn.mythicland.combatsystem.stats;
 import cn.mythicland.combatsystem.api.CombatStatsSnapshot;
 import cn.mythicland.combatsystem.lore.CombatItemStats;
 import cn.mythicland.combatsystem.lore.CombatStat;
+import cn.mythicland.dreamrpg.api.HealthSnapshot;
 import cn.mythicland.lib.item.NumericRange;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -89,6 +91,22 @@ class CombatStatsServiceTest {
         assertEquals(-20.0D, result.damageMinimum());
         assertEquals(-10.0D, result.damageMaximum());
         assertFalse(result.hasDamage());
+    }
+
+    @Test
+    void includesDreamRpgBaseAndLevelHealthInTheTotal() {
+        CombatStatsSnapshot result = CombatStatsService.aggregate(
+                List.of(new CombatItemStats(
+                        Map.of(CombatStat.HEALTH, new NumericRange(15.0D, 15.0D, false)),
+                        List.of()
+                )),
+                new HealthSnapshot(UUID.randomUUID(), 10L, 20.0D, 50.0D, 70.0D, true)
+        );
+
+        assertEquals(15.0D, result.health());
+        assertEquals(20.0D, result.baseHealth());
+        assertEquals(50.0D, result.levelHealthBonus());
+        assertEquals(85.0D, result.totalHealth());
     }
 
     @Test

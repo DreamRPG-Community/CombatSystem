@@ -27,7 +27,7 @@ final class CombatStatsDisplay {
                 valueLine("&4", label(settings, CombatStat.DAMAGE, "伤害"), damageValue(stats)),
                 valueLine("&b", label(settings, CombatStat.DEFENSE, "防御"),
                         stats.hasDefense() ? format(stats.defensePercent()) + "%" : "原版护甲"),
-                valueLine("&a", label(settings, CombatStat.HEALTH, "生命值"), format(stats.health())),
+                valueLine("&a", label(settings, CombatStat.HEALTH, "生命值"), format(stats.totalHealth())),
                 valueLine("&2", label(settings, CombatStat.HEALTH_REGEN, "生命回复"),
                         format(stats.healthRegenPercent()) + "%"),
                 valueLine("&c", label(settings, CombatStat.CRIT_CHANCE, "暴击几率"),

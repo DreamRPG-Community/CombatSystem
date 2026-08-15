@@ -6,6 +6,7 @@ import cn.mythicland.combatsystem.config.CombatSettings;
 import cn.mythicland.combatsystem.lore.CombatItemStats;
 import cn.mythicland.combatsystem.lore.CombatLoreParser;
 import cn.mythicland.combatsystem.lore.CombatStat;
+import cn.mythicland.dreamrpg.api.HealthSnapshot;
 import cn.mythicland.lib.item.ItemLoreReader;
 import cn.mythicland.lib.item.NumericRange;
 import org.bukkit.entity.LivingEntity;
@@ -23,12 +24,13 @@ public final class CombatStatsService implements CombatApi {
 
     private final JavaPlugin plugin;
     private final Function<UUID, OptionalLong> rpgLevelResolver;
+    private final DreamRpgHealthResolver rpgHealthResolver;
     private final Map<String, Long> warningTimes = new HashMap<>();
     private volatile CombatLoreParser parser;
     private volatile CombatSettings settings;
 
     public CombatStatsService(JavaPlugin plugin, CombatSettings settings) {
-        this(plugin, settings, null);
+        this(plugin, settings, null, null);
     }
 
     /**
@@ -44,13 +46,35 @@ public final class CombatStatsService implements CombatApi {
             CombatSettings settings,
             Function<UUID, OptionalLong> rpgLevelResolver
     ) {
+        this(plugin, settings, rpgLevelResolver, null);
+    }
+
+    /**
+     * Creates the combat attribute service with optional DreamRPG level and health bridges.
+     *
+     * @param plugin            owning plugin
+     * @param settings          immutable combat settings
+     * @param rpgLevelResolver  optional RPG level resolver
+     * @param rpgHealthResolver optional DreamRPG health resolver
+     */
+    public CombatStatsService(
+            JavaPlugin plugin,
+            CombatSettings settings,
+            Function<UUID, OptionalLong> rpgLevelResolver,
+            DreamRpgHealthResolver rpgHealthResolver
+    ) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.rpgLevelResolver = rpgLevelResolver;
+        this.rpgHealthResolver = rpgHealthResolver;
         this.parser = new CombatLoreParser(settings);
     }
 
     static CombatStatsSnapshot aggregate(List<CombatItemStats> itemStats) {
+        return aggregate(itemStats, null);
+    }
+
+    static CombatStatsSnapshot aggregate(List<CombatItemStats> itemStats, HealthSnapshot rpgHealth) {
         Objects.requireNonNull(itemStats, "itemStats");
         double damageMinimum = 0.0D;
         double damageMaximum = 0.0D;
@@ -80,7 +104,7 @@ public final class CombatStatsService implements CombatApi {
             experienceBonus += average(item, CombatStat.EXPERIENCE_BONUS);
         }
 
-        return CombatStatsSnapshot.builder()
+        CombatStatsSnapshot.Builder builder = CombatStatsSnapshot.builder()
                 .damageMinimum(damageMinimum)
                 .damageMaximum(damageMaximum)
                 .hasDamage(damageMaximum > 0.0D)
@@ -90,8 +114,12 @@ public final class CombatStatsService implements CombatApi {
                 .healthRegenPercent(Math.clamp(healthRegen, 0.0D, 100.0D))
                 .critChancePercent(Math.clamp(critChance, 0.0D, 100.0D))
                 .critDamagePercent(critDamage)
-                .experienceBonusPercent(experienceBonus)
-                .build();
+                .experienceBonusPercent(experienceBonus);
+        if (rpgHealth != null && rpgHealth.enabled()) {
+            builder.baseHealth(rpgHealth.baseHealth())
+                    .levelHealthBonus(rpgHealth.levelHealthBonus());
+        }
+        return builder.build();
     }
 
     private static List<ItemStack> supportedEquipment(LivingEntity entity) {
@@ -158,7 +186,10 @@ public final class CombatStatsService implements CombatApi {
             if (levelGateEnabled && !usableAtLevel(stats, rpgLevel)) continue;
             itemStats.add(stats);
         }
-        return aggregate(itemStats);
+        HealthSnapshot rpgHealth = levelGateEnabled && entity instanceof Player player
+                ? resolveRpgHealth(player).orElse(null)
+                : null;
+        return aggregate(itemStats, rpgHealth);
     }
 
     @Override
@@ -234,6 +265,14 @@ public final class CombatStatsService implements CombatApi {
         return Objects.requireNonNull(
                 rpgLevelResolver.apply(player.getUniqueId()),
                 "rpgLevelResolver result"
+        );
+    }
+
+    private Optional<HealthSnapshot> resolveRpgHealth(Player player) {
+        if (rpgHealthResolver == null) return Optional.empty();
+        return Objects.requireNonNull(
+                rpgHealthResolver.resolve(player.getUniqueId()),
+                "rpgHealthResolver result"
         );
     }
 

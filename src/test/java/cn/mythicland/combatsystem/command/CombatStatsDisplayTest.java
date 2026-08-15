@@ -18,6 +18,8 @@ class CombatStatsDisplayTest {
                 .defensePercent(100.0D)
                 .hasDefense(true)
                 .health(100.0D)
+                .baseHealth(20.0D)
+                .levelHealthBonus(50.0D)
                 .healthRegenPercent(100.0D)
                 .experienceBonusPercent(-50.0D)
                 .build();
@@ -27,7 +29,7 @@ class CombatStatsDisplayTest {
                 "  §f",
                 "  §4伤害: §f100",
                 "  §b防御: §f100%",
-                "  §a生命值: §f100",
+                "  §a生命值: §f170",
                 "  §2生命回复: §f100%",
                 "  §c暴击几率: §f0%",
                 "  §4暴击伤害: §f0%",

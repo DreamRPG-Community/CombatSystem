@@ -67,7 +67,8 @@ public final class CombatSystemLifecycle implements LibPluginLifecycle, CombatAp
         statsService = new CombatStatsService(
                 plugin,
                 settings,
-                experienceIntegration == null ? null : experienceIntegration::rpgLevel
+                experienceIntegration == null ? null : experienceIntegration::rpgLevel,
+                experienceIntegration == null ? null : experienceIntegration::rpgHealth
         );
         MythicMobsAdapter mythicMobsAdapter = MythicMobsAdapter.detect();
         healthBarService = new CombatHealthBarService(mythicMobsAdapter);
